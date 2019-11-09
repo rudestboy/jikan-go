@@ -19,44 +19,38 @@ type Episode struct {
 }
 
 type EpisodesResponse struct {
-	RequestHash        string     `json:"request_hash"`
-	RequestCached      bool       `json:"request_cached"`
-	RequestCacheExpiry int        `json:"request_cache_expiry"`
-	EpisodesLastPage   int        `json:"episodes_last_page"`
-	Episodes           []*Episode `json:"episodes"`
+	EpisodesLastPage int        `json:"episodes_last_page"`
+	Episodes         []*Episode `json:"episodes"`
 }
 
-// TODO: maybe take in the page number and handle retries higher in the stack?
-func (c *Client) GetEpisodes(animeID int) ([]*Episode, error) {
-	page := 1
-	episodes := []*Episode{}
+type GetEpisodeOptions struct {
+	Page int
+}
 
-	for {
-		url := buildUrl(fmt.Sprintf("anime/%v/episodes/%d", animeID, page))
-
-		resp, err := c.Get(url)
-		if err != nil {
-			return []*Episode{}, err
-		}
-		defer resp.Body.Close()
-
-		episodesResponse := &EpisodesResponse{}
-		if err := json.NewDecoder(resp.Body).Decode(episodesResponse); err != nil {
-			return []*Episode{}, err
-		}
-
-		if resp.StatusCode != 200 {
-			return []*Episode{}, fmt.Errorf("received status code %d when requesting Anime with ID %d", resp.StatusCode, animeID)
-		}
-
-		episodes = append(episodes, episodesResponse.Episodes...)
-
-		if page <= episodesResponse.EpisodesLastPage {
-			page++
-		} else {
-			break
-		}
+func (c *Client) GetEpisodes(animeID int, opts *GetEpisodeOptions) (*EpisodesResponse, error) {
+	var page int
+	if opts.Page != 0 {
+		page = opts.Page
+	} else {
+		page = 1
 	}
 
-	return episodes, nil
+	url := buildUrl(fmt.Sprintf("anime/%v/episodes/%d", animeID, page))
+
+	resp, err := c.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	episodesResponse := &EpisodesResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(episodesResponse); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("received status code %d when requesting episodes for Anime with ID %d", resp.StatusCode, animeID)
+	}
+
+	return episodesResponse, nil
 }
